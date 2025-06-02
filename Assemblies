@@ -1,0 +1,87 @@
+#!/bin/bash
+#SBATCH --job-name=filtlong_flye_quast_qc15
+#SBATCH --mail-type=END,FAIL
+#SBATCH --mail-user=email@ufl.edu
+#SBATCH --ntasks=1
+#SBATCH --mem=128gb
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=38
+#SBATCH --time=48:00:00
+#SBATCH --output=filtlong_flye_quast_qc15_%j.log
+#SBATCH --account=group
+#SBATCH --qos=group-b
+
+# List of directories (samples)
+samples=(
+    "T13-3A" "T13-3merge" "T13-3B"
+    "T24A" "T24B" "T24merge"
+    "T26A" "T26B" "T26merge"
+    "T35A" "T35B" "T35merge" "T35HMW"
+    "T57-25A" "T57-25B" "T57-25merge"
+    "T69A" "T69B" "T69merge"
+)
+
+# Input and Output directories
+INPUT_DIR=/path/to/AtNPR1citrus
+OUTPUT_DIR=/path/to/all_qc15_assemblies
+QUAST_OUTPUT_DIR=/path/to/quast_stats_qc15assemblies
+
+# Reference genome for QUAST
+REFERENCE="path/to/ncbi_dataset/data/GCF_022201045.2/GCF_022"
+
+# Ensure the output directories exist
+mkdir -p $OUTPUT_DIR
+mkdir -p $QUAST_OUTPUT_DIR
+
+# Load necessary modules
+module load filtlong
+module load flye
+module load quast
+
+# Loop through each sample, run Filtlong, Flye, and QUAST
+for sample in "${samples[@]}"; do
+    echo "Processing $sample..."
+
+    # Extract the main sample and directory structure from the sample name
+    main_sample=$(echo $sample | sed 's/[A-Za-z]*$//')  # Extracts numeric part + T
+    
+    # Define input raw reads path for each sample
+    INPUT_FILE="$INPUT_DIR/${main_sample}assembly/all_${sample}.qc10.fastq.gz"
+    
+    # Define output path for filtered reads
+    OUTPUT_FILE="$OUTPUT_DIR/all_${sample}.qc15.fastq.gz"
+
+    # Check if input file exists
+    if [ -f "$INPUT_FILE" ]; then
+        # Step 1: Run Filtlong with Phred score filtering to qc15 and gzip the output
+        filtlong --min_mean_q 15 $INPUT_FILE | gzip > $OUTPUT_FILE
+        echo "$sample filtering complete. Output saved to $OUTPUT_FILE"
+        
+        # Step 2: Run Flye assembly using the filtered reads
+        echo "Running Flye assembly for $sample..."
+        flye --nano-hq $OUTPUT_FILE \
+             --out-dir $OUTPUT_DIR/${sample}_assembly \
+             --asm-coverage 60 \
+             --genome-size 370m \
+             --threads 38
+        echo "Flye assembly for $sample complete. Output saved to $OUTPUT_DIR/${sample}_assembly"
+        
+        # Step 3: Run QUAST on the newly generated assembly
+        echo "Running QUAST for $sample..."
+        QUAST_ASSEMBLY="$OUTPUT_DIR/${sample}_assembly/assembly.fasta"
+        QUAST_OUTPUT="$QUAST_OUTPUT_DIR/${sample}_quast"
+        
+        if [ -f "$QUAST_ASSEMBLY" ]; then
+            quast $QUAST_ASSEMBLY \
+                  -R $REFERENCE \
+                  --fast \
+                  -o $QUAST_OUTPUT
+            echo "QUAST analysis for $sample complete. Output saved to $QUAST_OUTPUT"
+        else
+            echo "Warning: Assembly file not found for $sample. Skipping QUAST."
+        fi
+        
+    else
+        echo "Warning: $INPUT_FILE not found for sample $sample"
+    fi
+done
