@@ -1,0 +1,47 @@
+#!/bin/bash
+#SBATCH --job-name=align_unmapped_to_C
+#SBATCH --mail-type=END,FAIL
+#SBATCH --mail-user=email@ufl.edu
+#SBATCH --ntasks=1
+#SBATCH --mem=80gb
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=10
+#SBATCH --time=1-00:00:00
+#SBATCH --output=align_unmapped_to_chr_%j.log
+#SBATCH --account=group
+#SBATCH --qos=group-b
+
+# Load necessary modules and activate environment
+module load conda
+conda activate python3_env
+
+# Define input and output directories
+SEQ_C="/path/to/ncbi_dataset/data/GCF_022201045.2/GCF_022201045.2_DVS_A1.0_genomic.fna"
+UNMAPPED_DIR="/path/to/unmapped_fragments/"
+OUTPUT_DIR="/path/to/find_chr/"
+
+# Create output directory if it doesn't exist
+mkdir -p ${OUTPUT_DIR}
+
+# Create log file for the script
+LOG_FILE="${OUTPUT_DIR}/alignment_to_chr_run.log"
+touch $LOG_FILE
+
+# Loop through each unaligned fragment file
+for UNMAPPED in ${UNMAPPED_DIR}/*.fasta; do
+    BASENAME=$(basename ${UNMAPPED} .fasta)
+
+    echo "Processing ${BASENAME} - Aligning to Sequence C" >> $LOG_FILE
+
+    # Align the unaligned fragments to Sequence C
+    minimap2 -a ${SEQ_C} ${UNMAPPED} > ${OUTPUT_DIR}/${BASENAME}_to_chr.sam 2>> $LOG_FILE
+    
+    if [ $? -eq 0 ]; then
+        touch ${OUTPUT_DIR}/${BASENAME}_to_chr_complete.flag
+        echo "Alignment completed for ${BASENAME} to Sequence C" >> $LOG_FILE
+    else
+        echo "Error in alignment for ${BASENAME} to Sequence C" >> $LOG_FILE
+    fi
+done
+
+echo "Alignment of all unaligned fragments to Sequence C completed." >> $LOG_FILE
