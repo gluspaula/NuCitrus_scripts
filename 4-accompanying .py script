@@ -1,0 +1,52 @@
+import argparse
+from Bio import SeqIO
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Extract unaligned fragments from sequence B")
+    parser.add_argument("--input", required=True, help="Input FASTA file (Sequence B)")
+    parser.add_argument("--alignments", required=True, help="File with alignment start/end positions")
+    parser.add_argument("--output", required=True, help="Output FASTA file for unaligned fragments")
+    return parser.parse_args()
+
+def extract_unaligned_fragments(seq_b, alignments, output_fasta):
+    with open(output_fasta, "w") as out_fasta:
+        with open("python_script.log", "a") as log_file:
+            log_file.write(f"Processing {seq_b}\n")
+            
+            # Parse the alignment file to get the start and end positions of alignments
+            with open(alignments) as align_file:
+                for line in align_file:
+                    line = line.strip()
+                    if not line:
+                        continue  # Skip empty lines
+
+                    try:
+                        start_pos, aligned_len = map(int, line.split())
+                        end_pos = start_pos + aligned_len - 1
+                        log_file.write(f"Alignment: start={start_pos}, length={aligned_len}, end={end_pos}\n")
+                    except ValueError:
+                        log_file.write(f"Skipping invalid line: {line}\n")
+                        continue
+
+                    # Read Sequence B and extract unaligned fragments
+                    for record in SeqIO.parse(seq_b, "fasta"):
+                        seq_len = len(record.seq)
+
+                        # Left fragment: from 1 to (start_pos - 1)
+                        if start_pos > 1:
+                            left_fragment = record.seq[:start_pos - 1]
+                            out_fasta.write(f">{record.id}_left\n{left_fragment}\n")
+                            log_file.write(f"Left fragment extracted: {record.id}_left\n")
+
+                        # Right fragment: from (end_pos + 1) to end of sequence
+                        if end_pos < seq_len:
+                            right_fragment = record.seq[end_pos + 1:]
+                            out_fasta.write(f">{record.id}_right\n{right_fragment}\n")
+                            log_file.write(f"Right fragment extracted: {record.id}_right\n")
+
+def main():
+    args = parse_args()
+    extract_unaligned_fragments(args.input, args.alignments, args.output)
+
+if __name__ == "__main__":
+    main()
