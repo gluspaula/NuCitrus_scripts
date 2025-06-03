@@ -1,0 +1,28 @@
+# Log files
+*.log
+*.err
+
+# Intermediate data and large outputs from your scripts
+*.bam
+*.sam
+*.fastq.gz
+*.fasta.gz
+*.fasta
+*.fna
+*.flag
+results/
+output/
+temp/
+quast_reports_qc15/
+aligned_sequences_extracted/
+alignment_csv_reports/
+mapped_to_reference/
+unmapped_fragments/
+
+# Operating system files (e.g., macOS specific)
+.DS_Store
+
+# Editor/IDE specific files (examples)
+.vscode/
+.idea/
+*~ # Backup files often created by editors
